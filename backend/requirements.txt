@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic
+sqlalchemy
+celery
+redis
+python-multipart
+requests
+python-dotenv

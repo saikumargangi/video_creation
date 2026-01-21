@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: story_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./shared:/app/shared
+      - ./jobs:/jobs
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///./backend.db
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JOBS_DIR=/jobs
+    depends_on:
+      - redis
+
+  worker:
+    build: ./worker
+    container_name: story_worker
+    volumes:
+      - ./worker:/app
+      - ./shared:/app/shared
+      - ./jobs:/jobs
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JOBS_DIR=/jobs
+    depends_on:
+      - redis
+      - backend
+
+  frontend:
+    build: ./frontend
+    container_name: story_frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+
+  redis:
+    image: redis:7-alpine
+    container_name: story_redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  jobs:  # Managed volume, but we heavily use host bind mount ./jobs for debugging as requested
