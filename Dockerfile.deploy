@@ -48,7 +48,7 @@ ENV DATABASE_URL="sqlite:///./backend.db"
 # Temporary jobs dir (ephemeral in most cloud runs, but works for single session)
 ENV JOBS_DIR="/app/jobs"
 
-RUN chmod +x start.sh
+RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
 
 # Expose only the frontend port
 EXPOSE 3000

@@ -9,7 +9,9 @@ redis-server --daemonize yes
 
 # 2. Generate Assets (if missing)
 echo "🎨 Generating assets..."
-python3 generate_assets.py
+# 2. Generate Assets (if missing)
+echo "🎨 Generating assets..."
+python3 generate_assets.py || echo "⚠️ Asset generation failed, continuing anyway..."
 
 # 3. Start Backend (FastAPI) in background
 echo "🐍 Starting Backend on port 8000..."
