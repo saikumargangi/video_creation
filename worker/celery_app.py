@@ -1,0 +1,22 @@
+import os
+from celery import Celery
+
+broker_url = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
+result_backend = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
+
+# Note: "story_worker" name should match across backend/worker for consistent exchange naming, 
+# though for simple queueing it's less critical.
+celery_app = Celery(
+    "story_worker",
+    broker=broker_url,
+    backend=result_backend,
+    include=["tasks"]
+)
+
+celery_app.conf.update(
+    task_serializer="json",
+    accept_content=["json"],
+    result_serializer="json",
+    timezone="UTC",
+    enable_utc=True,
+)
