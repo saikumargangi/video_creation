@@ -17,9 +17,9 @@ WORKDIR /app
 # --- Backend & Worker Setup ---
 COPY backend/requirements.txt ./backend/requirements.txt
 COPY worker/requirements.txt ./worker/requirements.txt
-# Merge requirements and install
-RUN cat backend/requirements.txt worker/requirements.txt > all_requirements.txt
-RUN pip install --no-cache-dir -r all_requirements.txt
+# Install requirements separately to safely ensure all packages are installed
+RUN pip install --no-cache-dir -r backend/requirements.txt
+RUN pip install --no-cache-dir -r worker/requirements.txt
 
 # --- Frontend Setup ---
 COPY frontend/package.json frontend/package-lock.json ./frontend/

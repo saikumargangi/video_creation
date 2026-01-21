@@ -26,7 +26,8 @@ cd ..
 echo "👷 Starting Worker..."
 cd worker
 # Run celery in background
-celery -A tasks worker --loglevel=info --concurrency=2 > ../worker.log 2>&1 &
+# Run celery in background, logging to stderr (unbuffered)
+PYTHONUNBUFFERED=1 celery -A tasks worker --loglevel=info --concurrency=2 >&2 &
 cd ..
 
 # 5. Start Frontend (Next.js) in foreground (this keeps container alive)
