@@ -17,7 +17,8 @@ python3 generate_assets.py || echo "⚠️ Asset generation failed, continuing a
 echo "🐍 Starting Backend on port 8000..."
 cd backend
 # Run with uvicorn in background, logging to file
-uvicorn main:app --host 127.0.0.1 --port 8000 > ../backend.log 2>&1 &
+# Run with uvicorn in background, but log to stdout for debugging
+uvicorn main:app --host 127.0.0.1 --port 8000 &
 cd ..
 
 # 4. Start Celery Worker in background
