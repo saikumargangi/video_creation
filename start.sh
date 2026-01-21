@@ -28,4 +28,5 @@ cd ..
 # 5. Start Frontend (Next.js) in foreground (this keeps container alive)
 echo "⚛️ Starting Frontend on port 3000..."
 cd frontend
-npm start
+# Use npx next start to allow passing arguments explicitly
+npx next start -p 3000 -H 0.0.0.0
