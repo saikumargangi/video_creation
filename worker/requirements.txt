@@ -7,7 +7,7 @@ redis
 python-multipart
 requests
 python-dotenv
-google-generativeai
+google-generativeai>=0.8.3
 moviepy==1.0.3
 pillow
 jsonschema
