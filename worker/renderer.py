@@ -19,7 +19,7 @@ def render_scene(scene: SceneLayout, output_path: str, character_path: str = Non
         bg_path = os.path.join(ASSETS_DIR, "backgrounds", f"{scene.location}.png")
         if os.path.exists(bg_path):
             bg_clip = ImageClip(bg_path).set_duration(duration)
-            bg_clip = bg_clip.resize(newsize=(1920, 1080))
+            bg_clip = bg_clip.resize(newsize=(1280, 720))
         else:
             # Fallback color based on location name hash or simple logic
             color = (100, 100, 100)
@@ -27,7 +27,7 @@ def render_scene(scene: SceneLayout, output_path: str, character_path: str = Non
             elif "street" in scene.location: color = (100, 120, 100)
             elif "office" in scene.location: color = (220, 220, 250)
             
-            bg_clip = ColorClip(size=(1920, 1080), color=color, duration=duration)
+            bg_clip = ColorClip(size=(1280, 720), color=color, duration=duration)
 
         # 2. Main Character
         # Overlay character centered
@@ -41,8 +41,8 @@ def render_scene(scene: SceneLayout, output_path: str, character_path: str = Non
              char_clip = ImageClip(character_path).set_duration(duration)
              # Simple "animation": maybe slight zoom or bounce?
              # For MVP: just static overlay
-             # Resize to reasonable height relative to 1080p
-             char_clip = char_clip.resize(height=800).set_pos(("center", "bottom"))
+             # Resize to reasonable height relative to 720p
+             char_clip = char_clip.resize(height=500).set_pos(("center", "bottom"))
              final_clip = CompositeVideoClip([bg_clip, char_clip])
         else:
              # Fallback if no character asset
@@ -54,18 +54,27 @@ def render_scene(scene: SceneLayout, output_path: str, character_path: str = Non
             # Ensure imagemagick is installed for TextClip
             # On failures, we might skip text or use a basic font
             try:
-                txt_clip = TextClip(scene.dialogue, fontsize=50, color='white', font='Liberation-Sans-Bold', stroke_color='black', stroke_width=2, size=(1800, None), method='caption')
+                txt_clip = TextClip(scene.dialogue, fontsize=40, color='white', font='Liberation-Sans-Bold', stroke_color='black', stroke_width=2, size=(1100, None), method='caption')
                 txt_clip = txt_clip.set_position(('center', 0.85), relative=True).set_duration(duration)
                 final_clip = CompositeVideoClip([final_clip, txt_clip])
             except Exception as e:
                 logger.error(f"Failed to generate TextClip: {e}")
 
         final_clip.fps = 30
-        final_clip.write_videofile(output_path, fps=30, codec="libx264", audio=False, verbose=False, logger=None)
+        final_clip.write_videofile(
+            output_path, 
+            fps=24, # Lower FPS to save CPU
+            codec="libx264", 
+            audio=False, 
+            verbose=False, 
+            logger=None,
+            preset="ultrafast", # Faster encoding, less memory
+            threads=1 # Single thread to reduce memory peak
+        )
         
     except Exception as e:
         logger.error(f"Error rendering scene {scene.scene_id}: {e}")
         # Create a red error clip so pipeline doesn't break completely
-        error_clip = ColorClip(size=(1920, 1080), color=(255, 0, 0), duration=scene.duration)
-        error_clip.fps = 30
-        error_clip.write_videofile(output_path, fps=30, codec="libx264")
+        error_clip = ColorClip(size=(1280, 720), color=(255, 0, 0), duration=scene.duration)
+        error_clip.fps = 24
+        error_clip.write_videofile(output_path, fps=24, codec="libx264", preset="ultrafast")

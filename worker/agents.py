@@ -180,7 +180,12 @@ def character_designer_agent(bible: SeriesBible, output_path: str) -> bool:
                         logger.info(f"Character image saved to {output_path}")
                         return True
             
-            logger.warning("No image parts found in response.")
+            logger.warning(f"No image parts found in response. Full response: {response}")
+            try:
+                if hasattr(response, 'prompt_feedback'):
+                    logger.warning(f"Prompt Feedback: {response.prompt_feedback}")
+            except:
+                pass
             
         except Exception as e:
             logger.error(f"Failed generation with {target_model}: {e}")
