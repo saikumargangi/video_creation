@@ -2,7 +2,8 @@ import os
 try:
     from PIL import Image
     print("PIL imported successfully")
-except ImportError:
+except ImportError as e:
+    print(f"PIL import failed: {e}")
     print("PIL not installed")
     exit(1)
 
