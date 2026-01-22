@@ -23,7 +23,17 @@ T = TypeVar("T", bound=BaseModel)
 class AgentError(Exception):
     pass
 
-model = genai.GenerativeModel('gemini-1.5-flash')
+
+# Debug: List available models to stderr
+try:
+    print("Available Gemini Models:", flush=True)
+    for m in genai.list_models():
+        if 'generateContent' in m.supported_generation_methods:
+            print(f"- {m.name}", flush=True)
+except Exception as e:
+    logger.warning(f"Failed to list models: {e}")
+
+model = genai.GenerativeModel('gemini-1.5-flash-001')
 
 def call_gemini_json(prompt: str, schema_cls: Type[T], retry_count: int = 2) -> T:
     """Calls Gemini and parses JSON output into a Pydantic model with retries."""
