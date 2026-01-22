@@ -8,7 +8,7 @@ python-multipart
 requests
 python-dotenv
 google-generativeai
-moviepy
+moviepy==1.0.3
 pillow
 jsonschema
 
