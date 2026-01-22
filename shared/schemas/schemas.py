@@ -25,6 +25,7 @@ class JobStatus(BaseModel):
     progress_current: int
     progress_total: int
     message: Optional[str] = None
+    artifacts: Optional[dict] = None
 
 # --- Agent Output Schemas ---
 

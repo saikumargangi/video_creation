@@ -172,6 +172,28 @@ export default function Home() {
                             "{status.message}"
                         </p>
 
+                        {/* Agent Outputs */}
+                        {status.artifacts && (
+                            <div className="space-y-4">
+                                {status.artifacts.script && (
+                                    <div className="bg-neutral-900/50 rounded-xl p-4 border border-neutral-700">
+                                        <h3 className="text-sm font-bold text-neutral-400 uppercase mb-2">📜 Generated Script</h3>
+                                        <div className="max-h-40 overflow-y-auto text-xs font-mono text-neutral-300 whitespace-pre-wrap bg-black/20 p-2 rounded">
+                                            {status.artifacts.script}
+                                        </div>
+                                    </div>
+                                )}
+                                {status.artifacts.bible && (
+                                    <div className="bg-neutral-900/50 rounded-xl p-4 border border-neutral-700">
+                                        <h3 className="text-sm font-bold text-neutral-400 uppercase mb-2">📖 Series Bible</h3>
+                                        <div className="max-h-40 overflow-y-auto text-xs font-mono text-neutral-300 whitespace-pre-wrap bg-black/20 p-2 rounded">
+                                            {JSON.stringify(status.artifacts.bible, null, 2)}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {status.status === 'completed' && (
                             <div className="mt-8 p-4 bg-green-900/30 border border-green-500/50 rounded-xl flex flex-col items-center animate-in zoom-in duration-300">
                                 <p className="mb-4 text-green-300 font-bold">🎉 Your video is ready!</p>

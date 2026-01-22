@@ -60,9 +60,28 @@ async def get_status(job_id: str):
     status_file = os.path.join(job_dir, "status.json")
     if os.path.exists(status_file):
         with open(status_file, "r") as f:
-             # This file is written by the worker
-             import json
-             return json.load(f)
+             data = json.load(f)
+             
+        # Enhance with artifacts if available
+        artifacts = {}
+        
+        script_path = os.path.join(job_dir, "script.txt")
+        if os.path.exists(script_path):
+            with open(script_path, "r") as f:
+                artifacts["script"] = f.read()
+                
+        bible_path = os.path.join(job_dir, "bible.json")
+        if os.path.exists(bible_path):
+            with open(bible_path, "r") as f:
+                try:
+                    artifacts["bible"] = json.load(f)
+                except:
+                    pass
+        
+        if artifacts:
+            data["artifacts"] = artifacts
+            
+        return data
              
     return {"job_id": job_id, "status": "queued", "progress_current": 0, "progress_total": 0, "message": "Job queued"}
 
