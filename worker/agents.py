@@ -132,54 +132,63 @@ def character_designer_agent(bible: SeriesBible, output_path: str) -> bool:
         # 1. Generate the Image Prompt
         description = f"Name: {bible.character.name}. Outfit: {bible.character.outfit}. Appearance: {', '.join(bible.character.appearance_rules)}."
         prompt_maker_prompt = CHARACTER_DESIGNER_PROMPT.format(description=description)
-        response = model.generate_content(prompt_maker_prompt)
+        response = model.generate_content(prompt_maker_prompt) # Uses standard text model
         image_prompt = response.text.strip()
         
         logger.info(f"Generated Image Prompt: {image_prompt}")
 
-        image_model = None
-        # Try a list of potential image generation models
+        # 2. Generate the Image using proper SDK method
+        # 'gemini-2.0-flash' and specific image models can generate images via generate_content
+        # We try the specific one first, then the general one
         candidate_models = [
-            "imagen-3.0-generate-001", 
-            "gemini-2.0-flash-exp-image-generation",
-            "gemini-3-pro-image-preview"
+            "gemini-2.0-flash-exp", # Often supports multimodal output
+            "gemini-2.0-flash",
         ]
         
-        for m_name in candidate_models:
-            try:
-                # Check if model exists or just try to instantiate
-                # The SDK doesn't always fail on init, sometimes on generation
-                test_model = genai.ImageGenerationModel(m_name)
-                image_model = test_model
-                logger.info(f"Selected image model: {m_name}")
-                break
-            except Exception as e:
-                logger.warning(f"Model {m_name} not available: {e}")
+        # Check logs for available models, use one if found
+        # Hardcoding the one we saw in logs:
+        image_model_name = "gemini-2.0-flash-exp" # Trying standard 2.0 first as it is multimodal
         
-        if image_model:
-            try:
-                results = image_model.generate_images(
-                    prompt=image_prompt,
-                    number_of_images=1,
-                    aspect_ratio="3:4", 
-                    safety_filter_level="block_only_high",
-                    person_generation="allow_adult"
-                )
-                
-                if results and results.images:
-                    image = results.images[0]
-                    image.save(output_path)
-                    logger.info(f"Character image saved to {output_path}")
-                    return True
-            except Exception as ge:
-                 logger.error(f"Image generation failed with model: {ge}")
+        # Actually, let's look at the logs provided by user:
+        # - models/gemini-2.0-flash-exp-image-generation
+        # This is the gold standard if available.
+        target_model = "gemini-2.0-flash-exp-image-generation"
         
-        logger.error("Image generation returned no results or all models failed.")
+        try:
+            logging.info(f"Attempting image generation with {target_model}")
+            img_gen_model = genai.GenerativeModel(target_model)
+            response = img_gen_model.generate_content(image_prompt)
+            
+            # Check for image parts
+            if response.parts:
+                for part in response.parts:
+                    if part.inline_data:
+                        # Decode and save
+                        import base64
+                        img_data = base64.b64decode(part.inline_data.data) # SDK usually handles this but part.inline_data is the raw proto wrapper
+                        # Actually the python SDK wraps it. part.inline_data might be bytes or have .data
+                        # Let's try standard PIL loading from bytes
+                        from PIL import Image
+                        import io
+                        
+                        # The SDK part.inline_data is usually a blob. 
+                        # Let's inspect cautiously.
+                        # response.parts[0].inline_data.data is the bytes.
+                        image_bytes = part.inline_data.data
+                        image = Image.open(io.BytesIO(image_bytes))
+                        image.save(output_path)
+                        logger.info(f"Character image saved to {output_path}")
+                        return True
+            
+            logger.warning("No image parts found in response.")
+            
+        except Exception as e:
+            logger.error(f"Failed generation with {target_model}: {e}")
+            
         return False
 
     except Exception as e:
         logger.error(f"Character Designer Agent failed: {e}")
-        # Make sure to handle this downstream (fallback to default asset)
         return False
 
 def episode_director_agent(script: str, bible: SeriesBible) -> SceneManifest:
