@@ -33,7 +33,7 @@ try:
 except Exception as e:
     logger.warning(f"Failed to list models: {e}")
 
-model = genai.GenerativeModel('gemini-1.5-flash-001')
+model = genai.GenerativeModel('gemini-2.0-flash')
 
 def call_gemini_json(prompt: str, schema_cls: Type[T], retry_count: int = 2) -> T:
     """Calls Gemini and parses JSON output into a Pydantic model with retries."""
