@@ -12,6 +12,12 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+# Fix ImageMagick policy to allow TextClip (needed for MoviePy)
+RUN sed -i 's/none/read,write/g' /etc/ImageMagick-6/policy.xml
+
+# Ensure Pillow is available for asset generation immediately
+RUN pip install pillow
+
 WORKDIR /app
 
 # --- Backend & Worker Setup ---
