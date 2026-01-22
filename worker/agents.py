@@ -56,6 +56,17 @@ def call_gemini_json(prompt: str, schema_cls: Type[T], retry_count: int = 2) -> 
             text = text.strip()
 
             data = json.loads(text)
+            
+            # Robustness: Handle list wrapping if we expect a single item
+            # If data is a list of 1 item, and schema_cls is likely a Model (not a List type hint), unwrap it.
+            if isinstance(data, list) and len(data) == 1:
+                 # Be optimistic and try to unwrap if validation fails on the list itself, or just try to validate the item
+                 try:
+                     return schema_cls.model_validate(data[0])
+                 except ValidationError:
+                     # If unwrapping fails validation, maybe it WAS supposed to be a list, fall through to normal validation
+                     pass
+            
             return schema_cls.model_validate(data)
         except (json.JSONDecodeError, ValidationError) as e:
             logger.warning(f"Attempt {attempt + 1}/{retry_count + 1} failed: {e}")
@@ -88,7 +99,7 @@ bible.json schema:
 
 EPISODE_DIRECTOR_PROMPT = """You are an expert episode director. Split the screenplay into 18–24 scenes totaling 300 seconds (+/-2). Each scene 8–18 seconds. Use only bible locations and actions. Output ONLY valid JSON."""
 
-SCENE_LAYOUT_PROMPT = """You are a senior layout artist. Generate one render-ready scene JSON. Use only bible locations/actions/cameras. Dialogue must be 1–2 short lines. Output ONLY valid JSON."""
+SCENE_LAYOUT_PROMPT = """You are a senior layout artist. Generate one render-ready scene JSON. Output a SINGLE JSON object (not a list). Use only bible locations/actions/cameras. Dialogue must be 1–2 short lines."""
 
 CONTINUITY_SUPERVISOR_PROMPT = """You are a continuity supervisor. Validate ALL scene JSONs against the bible. Fix illegal values and shorten long dialogue. Ensure total duration ~300s. Output ONLY JSON: {issues_found:[], fixed_scenes:[]}."""
 
