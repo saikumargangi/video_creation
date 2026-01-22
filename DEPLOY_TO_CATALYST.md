@@ -1,71 +1,69 @@
 # Deployment Guide: Zoho Catalyst (AppSail)
 
-Since you cannot run Docker locally, you can deploy the components of this application to Zoho Catalyst (AppSail) or any other container platform.
+## Overview
+This project is configured as a **Monolithic Docker Container** for easy deployment on Zoho Catalyst AppSail. It bundles the Backend, Frontend, Celery Worker, and Redis into a single container.
 
-## Architecture on Catalyst
-You will need to deploy 4 separate services "apps" in AppSail (or 3 if you use a managed Redis):
-1.  **Backend** (FastAPI)
-2.  **Worker** (Celery)
-3.  **Frontend** (Next.js)
-4.  **Redis** (Message Broker)
+**Why this approach?**
+The current code uses a *shared filesystem* (local `/app/jobs` folder) to pass data between the API and the Worker. Deploying them as separate microservices would break this link. The monolithic approach preserves it.
 
-## Prerequisites
-1.  **Zoho CLI**: Install `zcli`.
-2.  **Catalyst Project**: Create a project in the Zoho Catalyst console.
-3.  **Git Remote**: Push this repository to GitHub/GitLab.
+## Deployment Steps
 
-## 1. Redis (Message Broker)
-Celery needs Redis to communicate between the Backend and Worker.
-*Option A (Easiest)*: Use a managed Redis provider (e.g., Upstash, Redis Cloud) and get a `redis://` URL.
-*Option B (Catalyst)*: Deploy a standard Redis docker image als an AppSail service.
+### 1. Prerequisites
+*   Zoho CLI installed (`npm install -g zcli`) or use the [Catalyst Console](https://catalyst.zoho.com/).
+*   A Project created in Zoho Catalyst.
 
-## 2. Backend Service
-1.  Navigate to `backend/`.
-2.  Initialize an AppSail service:
-    ```bash
-    catalyst appsail:init
-    # Select "Python", build path: .
-    ```
-3.  Update `app-config.json` (created by init) or set Environment Variables in the Console:
-    - `CELERY_BROKER_URL`: Your Redis URL
-    - `CELERY_RESULT_BACKEND`: Your Redis URL
-    - `GEMINI_API_KEY`: Your API Key
-    - `JOBS_DIR`: `/tmp` (Note: AppSail storage is ephemeral. For persistence, enable Catalyst File Store and use SDK, or use `/tmp` for demo).
-4.  Deploy:
-    ```bash
-    catalyst appsail:deploy
-    ```
-5.  Note the **Backend URL**.
+### 2. Deploy via AppSail Console (Git Integration)
+Since you have connected this project to GitHub, you do **not** need to zip files manually.
 
-## 3. Worker Service
-1.  Navigate to `worker/`.
-2.  Initialize AppSail:
-    ```bash
-    catalyst appsail:init
-    # Select "Python", build path: .
-    ```
-3.  **Crucial**: The `CMD` in Dockerfile must start the worker, NOT a web server. AppSail expects a web server usually, but for a worker, you might need to ensure it doesn't health-check fail.
-    *Workaround*: Run a small dummy web server alongside build, or configure AppSail to ignore health checks if possible.
-4.  Set Environment Variables (Same as Backend).
-5.  Deploy.
+1.  **Trigger Build**:
+    *   Go to your AppSail service in the Zoho Catalyst Console.
+    *   Click **Deploy** / **Build**.
+    *   Select your **Branch** (e.g., `main`).
 
-## 4. Frontend Service
-1.  Navigate to `frontend/`.
-2.  Initialize AppSail (Node.js).
-3.  Set Environment Variable:
-    - `NEXT_PUBLIC_API_URL`: The **Backend URL** from step 2.
-4.  Deploy.
+2.  **Build Configuration (Crucial)**:
+    *   **Build Context**: `/` (Root directory).
+    *   **Dockerfile Path**: `Dockerfile.deploy` (⚠️ **IMPORTANT**: You must manually change this from `Dockerfile` to `Dockerfile.deploy`).
+    *   **Port**: `3000`.
 
-## Shared Storage (Important)
-Since Backend writes files that Worker reads, and they are in *different* containers in the cloud, they **cannot share a filesystem** like `/jobs` on Docker Compose.
-**MVP Fix for Cloud**:
-You must modify the code to use **Cloud Storage** (AWS S3, Google Cloud Storage, or Zoho Catalyst File Store) instead of local files (`/jobs`) for passing data between agents and serving the final video.
+3.  **Configurations (Environmental Variables)**:
+    Ensure these are set in the "Configuration" tab:
+    *   `GEMINI_API_KEY`: `[Your Google Gemini API Key]` (Required)
+    *   `PORT`: `3000`
+    *   `HOST`: `0.0.0.0`
+    *   `PYTHONUNBUFFERED`: `1`
 
-*For this MVP code provided*: It relies on a shared Volume (`/jobs`). Verification in Zoho Catalyst will fail unless you switch to a single-container deployment (all in one) or implement cloud storage.
+4.  **Resources (Compute)**:
+    *   **Memory**: Select at least **1GB or 2GB**. 
+    *   **CPU**: 1 vCPU minimum.
 
-### Recommendation for "Single Container" (Simplest Cloud Deploy)
-To avoid rewriting storage logic:
-1.  Create a **new Dockerfile** in root that installs Redis, Python, and Node.
-2.  Run Backend, Worker, and Frontend *inside one container* using `supervisord`.
-3.  Deploy that ONE container to AppSail.
-4.  This mimics `docker-compose` behavior in a single box.
+### Alternative: Manual Upload
+If Git fails for any reason, you can use the source code upload method (Zip), but Git is preferred for continuous deployment.
+
+### 3. Deploy via CLI
+If you prefer the command line:
+
+```bash
+# Login
+zcli login
+
+# Initialize (if not already)
+catalyst appsail:init
+# Select your project
+# Service Name: video-creator
+# Stack: Docker (Use Dockerfile)
+
+# Deploy
+catalyst appsail:deploy
+```
+*Note: Ensure `app-config.json` points to `Dockerfile.deploy`.*
+
+## Important Considerations
+*   **Ephemeral Storage**: In AppSail, the filesystem is temporary. If the app restarts, **all generated videos and job history in `/jobs` will be lost**. For a production app, you must integrate Cloud Storage (Catalyst FileStore, S3, etc.).
+*   **Startup Time**: The container starts 4 services. It might take 10-20 seconds to become "Ready".
+*   **Logs**: Check "Logs" in the Catalyst Console if deployment fails. We have enabled full logging to `stderr`.
+
+## Testing
+Once deployed:
+1.  Open the AppSail URL (e.g., `https://video-creator.zohoapp.com`).
+2.  Paste a short story.
+3.  Watch the logs to see the "Job Submitted" and worker picking it up.
