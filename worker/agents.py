@@ -85,7 +85,7 @@ def call_gemini_json(prompt: str, schema_cls: Type[T], retry_count: int = 2) -> 
 
 # --- Prompts ---
 
-HEAD_WRITER_PROMPT = """You are a senior head writer from a world-class cartoon studio. Convert the story into a 5-minute screenplay with strong pacing and visual storytelling. Max 2 speaking characters. Dialogue is short and visual. Output ONLY screenplay text with scene headers."""
+HEAD_WRITER_PROMPT = """You are a senior head writer from a world-class cartoon studio. Convert the story into a short 15-second teaser screenplay. Max 2 speaking characters. Dialogue is extremely short and visual. Output ONLY screenplay text with scene headers."""
 
 SERIES_BIBLE_PROMPT = """You are the Series Bible Director for a global cartoon channel. Create a strict continuity bible: one main character, fixed outfit, consistent colors, allowed locations, props, motion library, camera styles, style rules. Output ONLY valid JSON.
 
@@ -99,11 +99,11 @@ bible.json schema:
   "camera_styles": ["wide","medium","close","tracking"]
 }"""
 
-EPISODE_DIRECTOR_PROMPT = """You are an expert episode director. Split the screenplay into 18–24 scenes totaling 300 seconds (+/-2). Each scene 8–18 seconds. Use only bible locations and actions. Output ONLY valid JSON."""
+EPISODE_DIRECTOR_PROMPT = """You are an expert episode director. Split the screenplay into exactly 3 scenes totaling 15 seconds (+/-2). Each scene 4–6 seconds. Use only bible locations and actions. Output ONLY valid JSON."""
 
 SCENE_LAYOUT_PROMPT = """You are a senior layout artist. Generate one render-ready scene JSON. Output a SINGLE JSON object (not a list). Use only bible locations/actions/cameras. Dialogue must be 1–2 short lines."""
 
-CONTINUITY_SUPERVISOR_PROMPT = """You are a continuity supervisor. Validate ALL scene JSONs against the bible. Fix illegal values and shorten long dialogue. Ensure total duration ~300s. Output ONLY JSON: {issues_found:[], fixed_scenes:[]}."""
+CONTINUITY_SUPERVISOR_PROMPT = """You are a continuity supervisor. Validate ALL scene JSONs against the bible. Fix illegal values and shorten long dialogue. Ensure total duration ~15s. Output ONLY JSON: {issues_found:[], fixed_scenes:[]}."""
 
 POST_PRODUCER_PROMPT = """You are a post-production producer. Create an assembly plan for stitching scenes. Output JSON with resolution=1920x1080 fps=30 format=mp4 subtitles=srt transitions disabled music disabled."""
 
