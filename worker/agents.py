@@ -43,6 +43,8 @@ def call_gemini_json(prompt: str, schema_cls: Type[T], retry_count: int = 2) -> 
     
     for attempt in range(retry_count + 1):
         try:
+            # Basic rate limiting to prevent 429 Resource Exhausted
+            time.sleep(2)
             response = model.generate_content(full_prompt, generation_config={"response_mime_type": "application/json"})
             text = response.text
             
@@ -135,32 +137,44 @@ def character_designer_agent(bible: SeriesBible, output_path: str) -> bool:
         
         logger.info(f"Generated Image Prompt: {image_prompt}")
 
-        # 2. Generate the Image using Imagen model
-        # We try a few likely model names for image generation
         image_model = None
-        try:
-            # Try specific Imagen model first
-            image_model = genai.ImageGenerationModel("imagen-3.0-generate-001")
-        except:
-            # Fallback (though SDK might not accept this string in this class)
-            logger.warning("Could not instantiate imagen-3.0-generate-001, trying default.")
+        # Try a list of potential image generation models
+        candidate_models = [
+            "imagen-3.0-generate-001", 
+            "gemini-2.0-flash-exp-image-generation",
+            "gemini-3-pro-image-preview"
+        ]
+        
+        for m_name in candidate_models:
+            try:
+                # Check if model exists or just try to instantiate
+                # The SDK doesn't always fail on init, sometimes on generation
+                test_model = genai.ImageGenerationModel(m_name)
+                image_model = test_model
+                logger.info(f"Selected image model: {m_name}")
+                break
+            except Exception as e:
+                logger.warning(f"Model {m_name} not available: {e}")
         
         if image_model:
-            results = image_model.generate_images(
-                prompt=image_prompt,
-                number_of_images=1,
-                aspect_ratio="3:4", 
-                safety_filter_level="block_only_high",
-                person_generation="allow_adult"
-            )
-            
-            if results and results.images:
-                image = results.images[0]
-                image.save(output_path)
-                logger.info(f"Character image saved to {output_path}")
-                return True
+            try:
+                results = image_model.generate_images(
+                    prompt=image_prompt,
+                    number_of_images=1,
+                    aspect_ratio="3:4", 
+                    safety_filter_level="block_only_high",
+                    person_generation="allow_adult"
+                )
+                
+                if results and results.images:
+                    image = results.images[0]
+                    image.save(output_path)
+                    logger.info(f"Character image saved to {output_path}")
+                    return True
+            except Exception as ge:
+                 logger.error(f"Image generation failed with model: {ge}")
         
-        logger.error("Image generation returned no results.")
+        logger.error("Image generation returned no results or all models failed.")
         return False
 
     except Exception as e:
