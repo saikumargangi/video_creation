@@ -51,6 +51,17 @@ def process_story(job_id, request_data):
         with open(os.path.join(job_dir, "bible.json"), "w") as f:
             f.write(bible.model_dump_json(indent=2))
             
+        update_job_status(job_id, "planning", 25, "Character Designer creating assets...")
+        
+        # 2.5 Character Designer
+        # Ensure job assets dir exists
+        job_assets_dir = os.path.join(job_dir, "assets")
+        os.makedirs(job_assets_dir, exist_ok=True)
+        character_path = os.path.join(job_assets_dir, "character.png")
+        
+        from agents import character_designer_agent
+        character_designer_agent(bible, character_path)
+            
         update_job_status(job_id, "planning", 30, "Director planning scenes...")
         
         # 3. Episode Director
@@ -122,9 +133,12 @@ def render_scene_task(job_id, scene_dict):
     job_dir = os.path.join(JOBS_DIR, job_id)
     output_path = os.path.join(job_dir, "scenes", f"{scene.scene_id:03d}.mp4")
     
+    # Check for job-specific character asset
+    character_path = os.path.join(job_dir, "assets", "character.png")
+    
     # Update status per scene? Might be too spammy. 
     # Just do the work.
-    render_scene(scene, output_path)
+    render_scene(scene, output_path, character_path=character_path)
     return output_path
 
 @celery_app.task(name="tasks.assemble_video")

@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "..", "shared", "assets")
 
-def render_scene(scene: SceneLayout, output_path: str):
+def render_scene(scene: SceneLayout, output_path: str, character_path: str = None):
     """
     Renders a single scene to an MP4 file.
     """
@@ -31,16 +31,22 @@ def render_scene(scene: SceneLayout, output_path: str):
 
         # 2. Main Character
         # Overlay character centered
-        char_path = os.path.join(ASSETS_DIR, "character", "main_character.png")
-        if os.path.exists(char_path):
-             char_clip = ImageClip(char_path).set_duration(duration)
+        
+        # Determine strict character path
+        if not character_path or not os.path.exists(character_path):
+             # Fallback to shared asset
+             character_path = os.path.join(ASSETS_DIR, "character", "main_character.png")
+
+        if os.path.exists(character_path):
+             char_clip = ImageClip(character_path).set_duration(duration)
              # Simple "animation": maybe slight zoom or bounce?
              # For MVP: just static overlay
+             # Resize to reasonable height relative to 1080p
              char_clip = char_clip.resize(height=800).set_pos(("center", "bottom"))
              final_clip = CompositeVideoClip([bg_clip, char_clip])
         else:
              # Fallback if no character asset
-             logger.warning(f"Character asset not found at {char_path}")
+             logger.warning(f"Character asset not found at {character_path}")
              final_clip = bg_clip
 
         # 3. Subtitles / Dialogue

@@ -105,6 +105,12 @@ CONTINUITY_SUPERVISOR_PROMPT = """You are a continuity supervisor. Validate ALL 
 
 POST_PRODUCER_PROMPT = """You are a post-production producer. Create an assembly plan for stitching scenes. Output JSON with resolution=1920x1080 fps=30 format=mp4 subtitles=srt transitions disabled music disabled."""
 
+CHARACTER_DESIGNER_PROMPT = """You are a Lead Character Designer.
+Create a detailed image generation prompt for a 2D animated character based on this description.
+The style should be: Flat 2D vector art, clean lines, vibrant colors, white background, full body standing pose, character sheet style.
+Description: {description}
+Output ONLY the prompt text."""
+
 
 # --- Agents ---
 
@@ -117,6 +123,50 @@ def head_writer_agent(story: str) -> str:
 def series_bible_agent(script: str) -> SeriesBible:
     prompt = f"{SERIES_BIBLE_PROMPT}\n\nSCRIPT:\n{script[:2000]}..." # Truncate for context window if needed, though 1.5 flash has large window
     return call_gemini_json(prompt, SeriesBible)
+
+def character_designer_agent(bible: SeriesBible, output_path: str) -> bool:
+    """Generates a character image and saves it to output_path."""
+    try:
+        # 1. Generate the Image Prompt
+        description = f"Name: {bible.character.name}. Outfit: {bible.character.outfit}. Appearance: {', '.join(bible.character.appearance_rules)}."
+        prompt_maker_prompt = CHARACTER_DESIGNER_PROMPT.format(description=description)
+        response = model.generate_content(prompt_maker_prompt)
+        image_prompt = response.text.strip()
+        
+        logger.info(f"Generated Image Prompt: {image_prompt}")
+
+        # 2. Generate the Image using Imagen model
+        # We try a few likely model names for image generation
+        image_model = None
+        try:
+            # Try specific Imagen model first
+            image_model = genai.ImageGenerationModel("imagen-3.0-generate-001")
+        except:
+            # Fallback (though SDK might not accept this string in this class)
+            logger.warning("Could not instantiate imagen-3.0-generate-001, trying default.")
+        
+        if image_model:
+            results = image_model.generate_images(
+                prompt=image_prompt,
+                number_of_images=1,
+                aspect_ratio="3:4", 
+                safety_filter_level="block_only_high",
+                person_generation="allow_adult"
+            )
+            
+            if results and results.images:
+                image = results.images[0]
+                image.save(output_path)
+                logger.info(f"Character image saved to {output_path}")
+                return True
+        
+        logger.error("Image generation returned no results.")
+        return False
+
+    except Exception as e:
+        logger.error(f"Character Designer Agent failed: {e}")
+        # Make sure to handle this downstream (fallback to default asset)
+        return False
 
 def episode_director_agent(script: str, bible: SeriesBible) -> SceneManifest:
     bible_ctx = bible.model_dump_json()
