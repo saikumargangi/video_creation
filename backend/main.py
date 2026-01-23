@@ -20,7 +20,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Force absolute path for Docker volume compatibility
 JOBS_DIR = os.getenv("JOBS_DIR", "/jobs")
+if not os.path.isabs(JOBS_DIR):
+    JOBS_DIR = os.path.abspath(JOBS_DIR)
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)

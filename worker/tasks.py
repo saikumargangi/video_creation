@@ -13,7 +13,10 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
+# Force absolute path for Docker volume compatibility
 JOBS_DIR = os.getenv("JOBS_DIR", "/jobs")
+if not os.path.isabs(JOBS_DIR):
+    JOBS_DIR = os.path.abspath(JOBS_DIR)
 
 def update_job_status(job_id, status, progress=0, message=None):
     job_dir = os.path.join(JOBS_DIR, job_id)
