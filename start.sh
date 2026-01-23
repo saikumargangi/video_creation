@@ -13,9 +13,17 @@ echo "🎨 Generating assets..."
 echo "🔍 Checking installed packages..."
 pip list | grep -i pillow || echo "❌ Pillow NOT found in pip list"
 
+echo "🐍 Python Environment:"
+which python
+python --version
+python -c "import sys; print(sys.path)"
+pip show pillow
+
 # 2. Generate Assets (fail loudly if this crashes)
 echo "🎨 Generating assets..."
-python3 generate_assets.py || echo "⚠️ Asset generation failed, continuing anyway..."
+# Try forcing install if missing?
+# pip install pillow
+python generate_assets.py || echo "⚠️ Asset generation failed, continuing anyway..."
 
 # 3. Start Backend (FastAPI) in background
 echo "🐍 Starting Backend on port 8000..."
