@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
         destination: 'http://127.0.0.1:8000/generate',
       },
       {
+        source: '/generate_character',
+        destination: 'http://127.0.0.1:8000/generate_character',
+      },
+      {
         source: '/status/:path*',
         destination: 'http://127.0.0.1:8000/status/:path*',
       },
