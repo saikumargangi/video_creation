@@ -1,5 +1,10 @@
 import os
 import logging
+# Monkeypatch PIL.Image.ANTIALIAS for moviepy compatibility
+import PIL.Image
+if not hasattr(PIL.Image, 'ANTIALIAS'):
+    PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
+
 from moviepy.editor import ColorClip, TextClip, CompositeVideoClip, ImageClip
 from shared.schemas.schemas import SceneLayout
 
