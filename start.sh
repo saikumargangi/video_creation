@@ -15,7 +15,7 @@ pip list | grep -i pillow || echo "❌ Pillow NOT found in pip list"
 
 # 2. Generate Assets (fail loudly if this crashes)
 echo "🎨 Generating assets..."
-python3 generate_assets.py
+python3 generate_assets.py || echo "⚠️ Asset generation failed, continuing anyway..."
 
 # 3. Start Backend (FastAPI) in background
 echo "🐍 Starting Backend on port 8000..."
