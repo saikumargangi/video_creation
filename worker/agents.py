@@ -48,13 +48,19 @@ def call_gemini_json(prompt: str, schema_cls: Type[T], retry_count: int = 2) -> 
             response = model.generate_content(full_prompt, generation_config={"response_mime_type": "application/json"})
             text = response.text
             
-            # Clean up potential markdown code blocks
-            if text.startswith("```json"):
-                text = text[7:]
-            if text.startswith("```"):
-                text = text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
+            # Clean up potential markdown code blocks and conversational text
+            start = text.find("{")
+            end = text.rfind("}") + 1
+            if start != -1 and end != -1:
+                text = text[start:end]
+            else:
+                # Fallback basics if braces not found (unlikely for valid JSON)
+                if text.startswith("```json"):
+                    text = text[7:]
+                if text.startswith("```"):
+                    text = text[3:]
+                if text.endswith("```"):
+                    text = text[:-3]
             text = text.strip()
 
             data = json.loads(text)

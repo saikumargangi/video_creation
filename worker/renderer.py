@@ -10,7 +10,12 @@ from shared.schemas.schemas import SceneLayout
 
 logger = logging.getLogger(__name__)
 
-ASSETS_DIR = os.path.join(os.path.dirname(__file__), "..", "shared", "assets")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Dynamic path resolution for Docker (child) vs Local (sibling)
+if os.path.exists(os.path.join(BASE_DIR, "shared", "assets")):
+    ASSETS_DIR = os.path.join(BASE_DIR, "shared", "assets")
+else:
+    ASSETS_DIR = os.path.join(BASE_DIR, "..", "shared", "assets")
 
 def render_scene(scene: SceneLayout, output_path: str, character_path: str = None):
     """
