@@ -107,9 +107,8 @@ CONTINUITY_SUPERVISOR_PROMPT = """You are a continuity supervisor. Validate ALL 
 
 POST_PRODUCER_PROMPT = """You are a post-production producer. Create an assembly plan for stitching scenes. Output JSON with resolution=1920x1080 fps=30 format=mp4 subtitles=srt transitions disabled music disabled."""
 
-CHARACTER_DESIGNER_PROMPT = """You are a Lead Character Designer.
-Create a detailed image generation prompt for a 2D animated character based on this description.
-The style should be: Flat 2D vector art, clean lines, vibrant colors, white background, full body standing pose, character sheet style.
+CHARACTER_DESIGNER_PROMPT = """You are a prompt engineer for an image generation model.
+Convert this character description into a precise, comma-separated image generation prompt.
 Description: {description}
 Output ONLY the prompt text."""
 
@@ -165,30 +164,33 @@ def character_designer_agent(bible: SeriesBible, output_path: str) -> bool:
                     if part.inline_data:
                         # Decode and save
                         import base64
-                        img_data = base64.b64decode(part.inline_data.data) # SDK usually handles this but part.inline_data is the raw proto wrapper
-                        # Actually the python SDK wraps it. part.inline_data might be bytes or have .data
-                        # Let's try standard PIL loading from bytes
+                        image_bytes = part.inline_data.data
                         from PIL import Image
                         import io
-                        
-                        # The SDK part.inline_data is usually a blob. 
-                        # Let's inspect cautiously.
-                        # response.parts[0].inline_data.data is the bytes.
-                        image_bytes = part.inline_data.data
                         image = Image.open(io.BytesIO(image_bytes))
                         image.save(output_path)
                         logger.info(f"Character image saved to {output_path}")
                         return True
             
-            logger.warning(f"No image parts found in response. Full response: {response}")
-            try:
-                if hasattr(response, 'prompt_feedback'):
-                    logger.warning(f"Prompt Feedback: {response.prompt_feedback}")
-            except:
-                pass
+            logger.warning(f"No image parts found in response from {target_model}. Response: {response}")
+
+            # Fallback to standard 2.0-flash-exp (multimodal) if specialized model returns text
+            logger.info("Falling back to gemini-2.0-flash-exp...")
+            fallback_model = genai.GenerativeModel("gemini-2.0-flash-exp")
+            response = fallback_model.generate_content(image_prompt)
+            if response.parts:
+                for part in response.parts:
+                     if part.inline_data:
+                        import base64
+                        from PIL import Image
+                        import io
+                        image = Image.open(io.BytesIO(part.inline_data.data))
+                        image.save(output_path)
+                        logger.info(f"Character image saved with fallback model to {output_path}")
+                        return True
             
         except Exception as e:
-            logger.error(f"Failed generation with {target_model}: {e}")
+            logger.error(f"Failed generation: {e}")
             
         return False
 
