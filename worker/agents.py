@@ -156,7 +156,8 @@ def character_designer_agent(bible: SeriesBible, output_path: str) -> bool:
         try:
             logging.info(f"Attempting image generation with {target_model}")
             img_gen_model = genai.GenerativeModel(target_model)
-            response = img_gen_model.generate_content(image_prompt)
+            # Force image generation intent
+            response = img_gen_model.generate_content(f"Generate an image of {image_prompt}")
             
             # Check for image parts
             if response.parts:
@@ -175,9 +176,11 @@ def character_designer_agent(bible: SeriesBible, output_path: str) -> bool:
             logger.warning(f"No image parts found in response from {target_model}. Response: {response}")
 
             # Fallback to standard 2.0-flash-exp (multimodal) if specialized model returns text
-            logger.info("Falling back to gemini-2.0-flash-exp...")
-            fallback_model = genai.GenerativeModel("gemini-2.0-flash-exp")
-            response = fallback_model.generate_content(image_prompt)
+            logger.info("Falling back to gemini-2.0-flash-exp-image-generation...")
+            # Try specific image model again or a different preview if available
+            fallback_model_name = "gemini-2.0-flash-exp" # Multimodal fallback
+            fallback_model = genai.GenerativeModel(fallback_model_name)
+            response = fallback_model.generate_content(f"Generate an image of {image_prompt}")
             if response.parts:
                 for part in response.parts:
                      if part.inline_data:
