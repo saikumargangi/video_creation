@@ -14,6 +14,10 @@ class JobRequest(BaseModel):
     style_pack: str = "basic_cartoon_v1"
     subtitles: bool = True
     voice: VoiceConfig = Field(default_factory=VoiceConfig)
+    character_job_id: Optional[str] = None # Link to pre-generated character
+
+class CharacterRequest(BaseModel):
+    prompt: str = "A friendly robot"
 
 class JobResponse(BaseModel):
     job_id: str

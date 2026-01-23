@@ -5,7 +5,7 @@ import shutil
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from shared.schemas.schemas import JobRequest, JobResponse, JobStatus
+from shared.schemas.schemas import JobRequest, JobResponse, JobStatus, CharacterRequest
 from celery_app import celery_app
 import logging
 
@@ -36,6 +36,17 @@ async def generate_video(request: JobRequest):
     os.makedirs(job_dir, exist_ok=True)
     os.makedirs(os.path.join(job_dir, "scenes"), exist_ok=True)
     os.makedirs(os.path.join(job_dir, "final"), exist_ok=True)
+    os.makedirs(os.path.join(job_dir, "assets"), exist_ok=True) # Ensure assets dir
+
+    # Handle linked character if provided
+    if request.character_job_id:
+        src_char_path = os.path.join(JOBS_DIR, request.character_job_id, "assets", "character.png")
+        dst_char_path = os.path.join(job_dir, "assets", "character.png")
+        if os.path.exists(src_char_path):
+            shutil.copy(src_char_path, dst_char_path)
+            logger.info(f"Copied character asset from {request.character_job_id} to {job_id}")
+        else:
+            logger.warning(f"Linked character job {request.character_job_id} not found or has no asset.")
 
     # Save inputs
     with open(os.path.join(job_dir, "input.json"), "w") as f:
@@ -46,6 +57,22 @@ async def generate_video(request: JobRequest):
 
     # Trigger Celery Task
     task = celery_app.send_task("tasks.process_story", args=[job_id, request.model_dump()])
+    
+    return {"job_id": job_id, "status": "queued"}
+
+@app.post("/generate_character", response_model=JobResponse)
+async def generate_character(request: CharacterRequest):
+    job_id = str(uuid.uuid4())
+    job_dir = os.path.join(JOBS_DIR, job_id)
+    os.makedirs(job_dir, exist_ok=True)
+    os.makedirs(os.path.join(job_dir, "assets"), exist_ok=True)
+    
+    # Save input
+    with open(os.path.join(job_dir, "character_prompt.txt"), "w") as f:
+        f.write(request.prompt)
+
+    # Trigger Task
+    task = celery_app.send_task("tasks.generate_character_only", args=[job_id, request.prompt])
     
     return {"job_id": job_id, "status": "queued"}
 
@@ -78,6 +105,13 @@ async def get_status(job_id: str):
                     artifacts["bible"] = json.load(f)
                 except:
                     pass
+        
+        character_path = os.path.join(job_dir, "assets", "character.png")
+        if os.path.exists(character_path):
+            import base64
+            with open(character_path, "rb") as img_f:
+                b64_str = base64.b64encode(img_f.read()).decode("utf-8")
+                artifacts["character_image"] = f"data:image/png;base64,{b64_str}"
         
         if artifacts:
             data["artifacts"] = artifacts

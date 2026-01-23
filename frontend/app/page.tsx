@@ -1,21 +1,76 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { submitJob, getJobStatus, getDownloadUrl } from '@/lib/api';
+import { submitJob, getJobStatus, getDownloadUrl, submitCharacterGen } from '@/lib/api';
 
 export default function Home() {
+    // Workflow State
+    const [step, setStep] = useState<'character' | 'story'>('character');
+
+    // Character Step State
+    const [charPrompt, setCharPrompt] = useState('');
+    const [charJobId, setCharJobId] = useState<string | null>(null);
+    const [charStatus, setCharStatus] = useState<any>(null);
+    const [charImage, setCharImage] = useState<string | null>(null);
+
+    // Story Step State
     const [story, setStory] = useState('');
     const [jobId, setJobId] = useState<string | null>(null);
     const [status, setStatus] = useState<any>(null);
+
+    // UI Loading States
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    // --- STEP 1: Character Generation ---
+    const handleCharSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+        setCharImage(null);
+        try {
+            const res = await submitCharacterGen(charPrompt);
+            setCharJobId(res.job_id);
+        } catch (err: any) {
+            setError(err.message);
+            setLoading(false);
+        }
+    };
+
+    // Poll for Character Status
+    useEffect(() => {
+        if (!charJobId) return;
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await getJobStatus(charJobId);
+                setCharStatus(res);
+
+                // Check if image is ready in artifacts
+                if (res.artifacts?.character_image) {
+                    setCharImage(res.artifacts.character_image);
+                    setLoading(false);
+                    clearInterval(interval);
+                } else if (res.status === 'failed') {
+                    setError("Character generation failed. Please try again.");
+                    setLoading(false);
+                    clearInterval(interval);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }, 1500);
+
+        return () => clearInterval(interval);
+    }, [charJobId]);
+
+    // --- STEP 2: Story Generation ---
+    const handleStorySubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
         try {
-            const res = await submitJob(story);
+            const res = await submitJob(story, charJobId); // Pass linked character ID
             setJobId(res.job_id);
         } catch (err: any) {
             setError(err.message);
@@ -23,6 +78,7 @@ export default function Home() {
         }
     };
 
+    // Poll for Video Status
     useEffect(() => {
         if (!jobId) return;
 
@@ -46,38 +102,106 @@ export default function Home() {
         <main className="min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-8 font-sans">
             <div className="max-w-3xl w-full bg-neutral-800 p-8 rounded-2xl shadow-2xl border border-neutral-700">
                 <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                    Story-to-Cartoon
+                    {step === 'character' ? 'Step 1: Create Character' : 'Step 2: Create Story'}
                 </h1>
-                <p className="text-neutral-400 mb-8">
-                    Turn your stories into 5-minute animated videos instantly.
-                </p>
 
-                {!jobId && (
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <textarea
-                            className="w-full h-40 bg-neutral-900 border border-neutral-700 rounded-xl p-4 text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all placeholder-neutral-600"
-                            placeholder="Write your story here... A robot finds a flower..."
-                            value={story}
-                            onChange={(e) => setStory(e.target.value)}
-                            required
-                        />
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {loading ? 'Starting...' : 'Generate Cartoon'}
-                        </button>
-                    </form>
-                )}
+                {/* Progress Indicators */}
+                <div className="flex gap-2 mb-8">
+                    <div className={`h-2 flex-1 rounded-full ${step === 'character' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
+                    <div className={`h-2 flex-1 rounded-full ${step === 'story' ? 'bg-blue-500' : 'bg-neutral-700'}`}></div>
+                </div>
 
                 {error && (
-                    <div className="mt-4 p-4 bg-red-900/50 border border-red-500 rounded-xl text-red-200">
+                    <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-xl text-red-200">
                         {error}
                     </div>
                 )}
 
-                {status && (
+                {/* --- VIEW 1: CHARACTER CREATION --- */}
+                {step === 'character' && (
+                    <div className="space-y-6">
+                        {!charImage ? (
+                            <form onSubmit={handleCharSubmit} className="space-y-4">
+                                <label className="block text-neutral-300 text-sm uppercase font-bold tracking-wider">Describe your Character</label>
+                                <textarea
+                                    className="w-full h-32 bg-neutral-900 border border-neutral-700 rounded-xl p-4 text-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder-neutral-600"
+                                    placeholder="e.g. A rusty robot with glowing blue eyes, wearing a tattered red scarf..."
+                                    value={charPrompt}
+                                    onChange={(e) => setCharPrompt(e.target.value)}
+                                    required
+                                    disabled={loading}
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg transition-all disabled:opacity-50"
+                                >
+                                    {loading ? 'Designing Character...' : 'Generate Character'}
+                                </button>
+                            </form>
+                        ) : (
+                            <div className="animate-in fade-in slide-in-from-bottom-4">
+                                <div className="bg-black/20 p-4 rounded-xl border border-neutral-700 flex flex-col items-center">
+                                    <img
+                                        src={charImage}
+                                        alt="Generated Character"
+                                        className="max-h-80 rounded-lg shadow-2xl border border-neutral-600 mb-6"
+                                    />
+                                    <div className="flex gap-4 w-full">
+                                        <button
+                                            onClick={() => { setCharImage(null); setCharJobId(null); }}
+                                            className="flex-1 py-3 bg-neutral-700 hover:bg-neutral-600 rounded-lg font-semibold transition-colors"
+                                        >
+                                            Try Again
+                                        </button>
+                                        <button
+                                            onClick={() => setStep('story')}
+                                            className="flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold shadow-lg transition-colors"
+                                        >
+                                            Use This Character →
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* --- VIEW 2: STORY GENERATION --- */}
+                {step === 'story' && !jobId && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-right-8">
+                        <div className="flex items-center gap-4 bg-neutral-900/50 p-4 rounded-xl border border-neutral-700">
+                            <img src={charImage!} className="w-16 h-16 rounded object-cover border border-neutral-600" />
+                            <div>
+                                <p className="text-sm text-neutral-400 uppercase font-bold">Locked Character</p>
+                                <p className="text-neutral-200 text-sm line-clamp-1">{charPrompt}</p>
+                            </div>
+                            <button onClick={() => setStep('character')} className="ml-auto text-sm text-blue-400 hover:underline">Change</button>
+                        </div>
+
+                        <form onSubmit={handleStorySubmit} className="space-y-4">
+                            <label className="block text-neutral-300 text-sm uppercase font-bold tracking-wider">Write your Story</label>
+                            <textarea
+                                className="w-full h-40 bg-neutral-900 border border-neutral-700 rounded-xl p-4 text-lg focus:ring-2 focus:ring-green-500 outline-none transition-all placeholder-neutral-600"
+                                placeholder={`Write a story featuring your character...\nFor example: The robot walks down the street and finds a flower.`}
+                                value={story}
+                                onChange={(e) => setStory(e.target.value)}
+                                required
+                                disabled={loading}
+                            />
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transition-all disabled:opacity-50"
+                            >
+                                {loading ? 'Starting Production...' : 'Target Action! (Generate Video)'}
+                            </button>
+                        </form>
+                    </div>
+                )}
+
+                {/* --- VIDEO PROGRESS VIEW (Optimized from original) --- */}
+                {jobId && status && (
                     <div className="mt-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="flex justify-between items-center bg-neutral-900/50 p-4 rounded-xl border border-neutral-700">
                             <div>
@@ -91,7 +215,6 @@ export default function Home() {
                             </div>
                         </div>
 
-                        {/* Progress Bar */}
                         <div className="w-full bg-neutral-700 h-2 rounded-full overflow-hidden">
                             <div
                                 className={`h-full transition-all duration-500 ease-out ${status.status === 'failed' ? 'bg-red-500' : 'bg-gradient-to-r from-blue-500 to-purple-500'}`}
@@ -99,80 +222,12 @@ export default function Home() {
                             />
                         </div>
 
-                        {/* Detailed Steps Verification List */}
-                        <div className="bg-neutral-900/30 rounded-xl p-4 border border-neutral-700/50 space-y-3">
-                            <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-4">Production Pipeline</h3>
-                            {[
-                                { label: "Story Analysis & Script", threshold: 10 },
-                                { label: "World Building (Series Bible)", threshold: 20 },
-                                { label: "Scene Planning & Layout", threshold: 30 },
-                                { label: "Continuity Check", threshold: 50 },
-                                { label: "Animation & Rendering", threshold: 60 }, // Inferred
-                                { label: "Final Assembly", threshold: 90 },
-                            ].map((step, idx) => {
-                                // Logic: 
-                                // Completed: progress >= next_step_threshold (or 100 if last)
-                                // Active: progress >= step.threshold && progress < next_check
-                                // Pending: progress < step.threshold
-
-                                // Simplified for linear progression:
-                                let state = 'pending';
-                                if (status.status === 'failed' && status.progress_current >= step.threshold && status.progress_current < (step.threshold + 10)) {
-                                    state = 'failed';
-                                } else if (status.progress_current >= step.threshold) {
-                                    // If we are significantly past this step, it's done. 
-                                    // "Rendering" (60) is tricky because 50->90 jump.
-                                    // If we are at 50, Planning(30) is done. 
-                                    const isCurrentStep = status.progress_current >= step.threshold &&
-                                        (idx === 5 ? status.progress_current < 100 : status.progress_current < [10, 20, 30, 50, 60, 90][idx + 1]!);
-
-                                    // Hacky override for the 50->90 gap
-                                    if (step.threshold === 50 && status.progress_current === 50) state = 'active'; // Continuity checking
-                                    else if (step.threshold === 60 && status.progress_current === 50) state = 'pending'; // Rendering hasn't started implied
-                                    // Wait, tasks.py updates to 50 THEN renders. So at 50, we are rendering.
-                                    // So actually: 
-                                    // State is 'completed' if progress > step.threshold
-                                    // State is 'active' if progress == step.threshold
-
-                                    if (status.progress_current > step.threshold) state = 'completed';
-                                    else if (status.progress_current === step.threshold) state = 'active';
-
-                                    // Fix for the 60 threshold which doesn't exist in backend
-                                    if (step.threshold === 60 && status.progress_current === 50) state = 'active'; // Rendering
-                                    if (step.threshold === 50 && status.progress_current === 50) state = 'completed'; // Continuity done instantly basically
-
-                                    if (status.status === 'completed') state = 'completed';
-                                }
-
-                                return (
-                                    <div key={idx} className="flex items-center gap-3">
-                                        <div className="w-6 h-6 flex items-center justify-center shrink-0">
-                                            {state === 'completed' && (
-                                                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                                            )}
-                                            {state === 'active' && (
-                                                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                                            )}
-                                            {state === 'pending' && (
-                                                <div className="w-2 h-2 bg-neutral-700 rounded-full" />
-                                            )}
-                                            {state === 'failed' && (
-                                                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                            )}
-                                        </div>
-                                        <span className={`text-sm ${state === 'active' ? 'text-blue-200 font-medium' : state === 'completed' ? 'text-neutral-500 line-through' : state === 'failed' ? 'text-red-400' : 'text-neutral-600'}`}>
-                                            {step.label}
-                                        </span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
                         <p className="text-neutral-400 text-center text-sm font-mono bg-black/20 p-2 rounded">
                             "{status.message}"
                         </p>
 
-                        {/* Agent Outputs */}
+
+                        {/* Agent Outputs - Restored for transparency */}
                         {status.artifacts && (
                             <div className="space-y-4">
                                 {status.artifacts.script && (
@@ -180,14 +235,6 @@ export default function Home() {
                                         <h3 className="text-sm font-bold text-neutral-400 uppercase mb-2">📜 Generated Script</h3>
                                         <div className="max-h-40 overflow-y-auto text-xs font-mono text-neutral-300 whitespace-pre-wrap bg-black/20 p-2 rounded">
                                             {status.artifacts.script}
-                                        </div>
-                                    </div>
-                                )}
-                                {status.artifacts.bible && (
-                                    <div className="bg-neutral-900/50 rounded-xl p-4 border border-neutral-700">
-                                        <h3 className="text-sm font-bold text-neutral-400 uppercase mb-2">📖 Series Bible</h3>
-                                        <div className="max-h-40 overflow-y-auto text-xs font-mono text-neutral-300 whitespace-pre-wrap bg-black/20 p-2 rounded">
-                                            {JSON.stringify(status.artifacts.bible, null, 2)}
                                         </div>
                                     </div>
                                 )}
@@ -200,24 +247,21 @@ export default function Home() {
                                 <video
                                     controls
                                     className="w-full rounded-lg shadow-lg mb-4 border border-neutral-700"
-                                    src={getDownloadUrl(jobId!)}
+                                    src={getDownloadUrl(jobId)}
                                 />
                                 <a
-                                    href={getDownloadUrl(jobId!)}
+                                    href={getDownloadUrl(jobId)}
                                     download
                                     className="px-8 py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold shadow-lg transition-colors flex items-center gap-2"
                                 >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                     Download MP4
                                 </a>
                             </div>
                         )}
-                        {status.status === 'failed' && (
-                            <div className="mt-8 p-4 bg-red-900/30 border border-red-500/50 rounded-xl">
-                                <p className="text-red-300 font-bold mb-2">Generation Failed</p>
-                                <p className="text-red-200 text-sm opacity-80">{status.message}</p>
-                            </div>
-                        )}
+
+                        <div className="text-center">
+                            <button onClick={() => window.location.reload()} className="text-neutral-500 hover:text-white transition-colors text-sm">Create New Video</button>
+                        </div>
                     </div>
                 )}
             </div>

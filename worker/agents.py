@@ -126,6 +126,55 @@ def series_bible_agent(script: str) -> SeriesBible:
     prompt = f"{SERIES_BIBLE_PROMPT}\n\nSCRIPT:\n{script[:2000]}..." # Truncate for context window if needed, though 1.5 flash has large window
     return call_gemini_json(prompt, SeriesBible)
 
+def generate_character_image(image_prompt: str, output_path: str) -> bool:
+    """Helper to generate an image from a prompt using Gemini models."""
+    # Hardcoded safety check just in case
+    image_prompt = image_prompt.replace("damaged", "weathered").replace("broken", "rustic")
+    
+    target_model = "gemini-2.0-flash-exp-image-generation"
+    try:
+        logging.info(f"Attempting image generation with {target_model}")
+        img_gen_model = genai.GenerativeModel(target_model)
+        # Force image generation intent
+        response = img_gen_model.generate_content(f"Generate an image of {image_prompt}")
+        
+        # Check for image parts
+        if response.parts:
+            for part in response.parts:
+                if part.inline_data:
+                    # Decode and save
+                    import base64
+                    image_bytes = part.inline_data.data
+                    from PIL import Image
+                    import io
+                    image = Image.open(io.BytesIO(image_bytes))
+                    image.save(output_path)
+                    logger.info(f"Character image saved to {output_path}")
+                    return True
+        
+        logger.warning(f"No image parts found in response from {target_model}. Response: {response}")
+
+        # Fallback to gemini-2.5-flash-image (dedicated image model)
+        logger.info("Falling back to gemini-2.5-flash-image...")
+        fallback_model_name = "gemini-2.5-flash-image" 
+        fallback_model = genai.GenerativeModel(fallback_model_name)
+        response = fallback_model.generate_content(f"Generate an image of {image_prompt}")
+        if response.parts:
+            for part in response.parts:
+                 if part.inline_data:
+                    import base64
+                    from PIL import Image
+                    import io
+                    image = Image.open(io.BytesIO(part.inline_data.data))
+                    image.save(output_path)
+                    logger.info(f"Character image saved with fallback model to {output_path}")
+                    return True
+        
+    except Exception as e:
+        logger.error(f"Failed generation: {e}")
+        
+    return False
+
 def character_designer_agent(bible: SeriesBible, output_path: str) -> bool:
     """Generates a character image and saves it to output_path."""
     try:
@@ -137,65 +186,7 @@ def character_designer_agent(bible: SeriesBible, output_path: str) -> bool:
         
         logger.info(f"Generated Image Prompt: {image_prompt}")
 
-        # 2. Generate the Image using proper SDK method
-        # 'gemini-2.0-flash' and specific image models can generate images via generate_content
-        # We try the specific one first, then the general one
-        candidate_models = [
-            "gemini-2.0-flash-exp", # Often supports multimodal output
-            "gemini-2.0-flash",
-        ]
-        
-        # Check logs for available models, use one if found
-        # Hardcoding the one we saw in logs:
-        image_model_name = "gemini-2.0-flash-exp" # Trying standard 2.0 first as it is multimodal
-        
-        # Actually, let's look at the logs provided by user:
-        # - models/gemini-2.0-flash-exp-image-generation
-        # This is the gold standard if available.
-        target_model = "gemini-2.0-flash-exp-image-generation"
-        
-        try:
-            logging.info(f"Attempting image generation with {target_model}")
-            img_gen_model = genai.GenerativeModel(target_model)
-            # Force image generation intent
-            response = img_gen_model.generate_content(f"Generate an image of {image_prompt}")
-            
-            # Check for image parts
-            if response.parts:
-                for part in response.parts:
-                    if part.inline_data:
-                        # Decode and save
-                        import base64
-                        image_bytes = part.inline_data.data
-                        from PIL import Image
-                        import io
-                        image = Image.open(io.BytesIO(image_bytes))
-                        image.save(output_path)
-                        logger.info(f"Character image saved to {output_path}")
-                        return True
-            
-            logger.warning(f"No image parts found in response from {target_model}. Response: {response}")
-
-            # Fallback to gemini-2.5-flash-image (dedicated image model)
-            logger.info("Falling back to gemini-2.5-flash-image...")
-            fallback_model_name = "gemini-2.5-flash-image" 
-            fallback_model = genai.GenerativeModel(fallback_model_name)
-            response = fallback_model.generate_content(f"Generate an image of {image_prompt}")
-            if response.parts:
-                for part in response.parts:
-                     if part.inline_data:
-                        import base64
-                        from PIL import Image
-                        import io
-                        image = Image.open(io.BytesIO(part.inline_data.data))
-                        image.save(output_path)
-                        logger.info(f"Character image saved with fallback model to {output_path}")
-                        return True
-            
-        except Exception as e:
-            logger.error(f"Failed generation: {e}")
-            
-        return False
+        return generate_character_image(image_prompt, output_path)
 
     except Exception as e:
         logger.error(f"Character Designer Agent failed: {e}")

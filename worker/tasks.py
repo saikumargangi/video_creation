@@ -30,6 +30,23 @@ def update_job_status(job_id, status, progress=0, message=None):
     with open(status_file, "w") as f:
         json.dump(data, f)
 
+@celery_app.task(name="tasks.generate_character_only")
+def generate_character_only(job_id, prompt):
+    update_job_status(job_id, "generating", 0, "Designing character...")
+    
+    job_dir = os.path.join(JOBS_DIR, job_id)
+    job_assets_dir = os.path.join(job_dir, "assets")
+    os.makedirs(job_assets_dir, exist_ok=True)
+    character_path = os.path.join(job_assets_dir, "character.png")
+    
+    from agents import generate_character_image
+    if generate_character_image(prompt, character_path):
+        update_job_status(job_id, "completed", 100, "Character ready")
+    else:
+        update_job_status(job_id, "failed", 0, "Character generation failed")
+        
+    return {"job_id": job_id, "status": "completed"}
+
 @celery_app.task(name="tasks.process_story")
 def process_story(job_id, request_data):
     update_job_status(job_id, "planning", 10, "Head Writer creating script...")
@@ -51,7 +68,7 @@ def process_story(job_id, request_data):
         with open(os.path.join(job_dir, "bible.json"), "w") as f:
             f.write(bible.model_dump_json(indent=2))
             
-        update_job_status(job_id, "planning", 25, "Character Designer creating assets...")
+        update_job_status(job_id, "planning", 25, "Checking character assets...")
         
         # 2.5 Character Designer
         # Ensure job assets dir exists
@@ -59,12 +76,18 @@ def process_story(job_id, request_data):
         os.makedirs(job_assets_dir, exist_ok=True)
         character_path = os.path.join(job_assets_dir, "character.png")
         
-        from agents import character_designer_agent
-        if character_designer_agent(bible, character_path):
-             update_job_status(job_id, "planning", 30, "Character created successfully")
+        # KEY CHANGE: Check if character already exists (from linked job)
+        if os.path.exists(character_path):
+             logger.info("Using existing character asset from linked job.")
+             update_job_status(job_id, "planning", 30, "Using approved character")
         else:
-             logger.warning("Character generation failed, using fallback.")
-             update_job_status(job_id, "planning", 30, "Character generation failed, using fallback")
+            # Generate from scratch if no pre-approved character
+            from agents import character_designer_agent
+            if character_designer_agent(bible, character_path):
+                 update_job_status(job_id, "planning", 30, "Character created successfully")
+            else:
+                 logger.warning("Character generation failed, using fallback.")
+                 update_job_status(job_id, "planning", 30, "Character generation failed, using fallback")
             
         update_job_status(job_id, "planning", 35, "Director planning scenes...")
         
