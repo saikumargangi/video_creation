@@ -60,9 +60,13 @@ def process_story(job_id, request_data):
         character_path = os.path.join(job_assets_dir, "character.png")
         
         from agents import character_designer_agent
-        character_designer_agent(bible, character_path)
+        if character_designer_agent(bible, character_path):
+             update_job_status(job_id, "planning", 30, "Character created successfully")
+        else:
+             logger.warning("Character generation failed, using fallback.")
+             update_job_status(job_id, "planning", 30, "Character generation failed, using fallback")
             
-        update_job_status(job_id, "planning", 30, "Director planning scenes...")
+        update_job_status(job_id, "planning", 35, "Director planning scenes...")
         
         # 3. Episode Director
         manifest = episode_director_agent(script, bible)
