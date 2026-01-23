@@ -9,20 +9,8 @@ redis-server --daemonize yes
 
 # 2. Generate Assets (if missing)
 echo "🎨 Generating assets..."
-# Debug: Check if PIL is installed
-echo "🔍 Checking installed packages..."
-pip list | grep -i pillow || echo "❌ Pillow NOT found in pip list"
-
-echo "🐍 Python Environment:"
-which python
-python --version
-python -c "import sys; print(sys.path)"
-pip show pillow
-
 # 2. Generate Assets (fail loudly if this crashes)
 echo "🎨 Generating assets..."
-# Try forcing install if missing?
-# pip install pillow
 python generate_assets.py || echo "⚠️ Asset generation failed, continuing anyway..."
 
 # 3. Start Backend (FastAPI) in background
