@@ -1,4 +1,5 @@
 import os
+import math
 import logging
 # Monkeypatch PIL.Image.ANTIALIAS for moviepy compatibility
 import PIL.Image
@@ -62,7 +63,7 @@ def render_scene(scene: SceneLayout, output_path: str, character_path: str = Non
                  char_clip = char_clip.set_position(lambda t: (1280/2 - 250 + 100 * t, "bottom"))
              elif "jump" in action:
                  # Simple jump (sin wave on Y)
-                 import math
+                # Simple jump (sin wave on Y)
                  char_clip = char_clip.set_pos(lambda t: ("center", 1080 - 500 - abs(math.sin(t*5)*50)))
              else:
                  # Idle "Breathing" (Subtle Zoom)
