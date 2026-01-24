@@ -49,10 +49,27 @@ def render_scene(scene: SceneLayout, output_path: str, character_path: str = Non
 
         if os.path.exists(character_path):
              char_clip = ImageClip(character_path).set_duration(duration)
-             # Simple "animation": maybe slight zoom or bounce?
-             # For MVP: just static overlay
-             # Resize to reasonable height relative to 720p
-             char_clip = char_clip.resize(height=500).set_pos(("center", "bottom"))
+             char_clip = char_clip.resize(height=500)
+
+             # --- Basic Animation Logic ---
+             action = (scene.action or "").lower()
+             
+             if "walk_in" in action or "enter" in action:
+                 # Slide in from left
+                 char_clip = char_clip.set_position(lambda t: (min(1280/2 - 250, -250 + (1280/2 + 250) * (t/1.5)), "bottom"))
+             elif "walk_out" in action or "leave" in action:
+                 # Slide out to right
+                 char_clip = char_clip.set_position(lambda t: (1280/2 - 250 + 100 * t, "bottom"))
+             elif "jump" in action:
+                 # Simple jump (sin wave on Y)
+                 import math
+                 char_clip = char_clip.set_pos(lambda t: ("center", 1080 - 500 - abs(math.sin(t*5)*50)))
+             else:
+                 # Idle "Breathing" (Subtle Zoom)
+                 # Zoom from 1.0 to 1.05
+                 char_clip = char_clip.resize(lambda t: 1 + 0.02 * math.sin(t*2))
+                 char_clip = char_clip.set_pos(("center", "bottom"))
+
              final_clip = CompositeVideoClip([bg_clip, char_clip])
         else:
              # Fallback if no character asset
