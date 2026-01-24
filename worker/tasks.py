@@ -130,30 +130,37 @@ def generate_scene_layout(job_id, scene_item_dict, bible_dict, script):
 
 @celery_app.task(name="tasks.continuity_check_and_render")
 def continuity_check_and_render(scene_layouts_dicts, job_id, bible_dict):
-    update_job_status(job_id, "planning", 50, "Continuity Supervisor checking...")
-    
-    from shared.schemas.schemas import SeriesBible, SceneLayout
-    bible = SeriesBible(**bible_dict)
-    scenes = [SceneLayout(**s) for s in scene_layouts_dicts]
-    
-    # 5. Continuity Supervisor
-    validation = continuity_supervisor_agent(scenes, bible)
-    final_scenes = validation.fixed_scenes
-    
-    job_dir = os.path.join(JOBS_DIR, job_id)
-    with open(os.path.join(job_dir, "debug_report.json"), "w") as f:
-        f.write(validation.model_dump_json(indent=2))
-
-    # 6. Post Producer Plan
-    editor_plan = post_producer_agent(final_scenes)
-    
-    # 7. Render Scenes (Parallel)
-    render_tasks = []
-    for scene in final_scenes:
-        render_tasks.append(render_scene_task.s(job_id, scene.model_dump()))
+    try:
+        update_job_status(job_id, "planning", 50, "Continuity Supervisor checking...")
         
-    # Execute render, then assembly
-    workflow = chord(render_tasks)(assemble_video.s(job_id))
+        from shared.schemas.schemas import SeriesBible, SceneLayout
+        bible = SeriesBible(**bible_dict)
+        scenes = [SceneLayout(**s) for s in scene_layouts_dicts]
+        
+        # 5. Continuity Supervisor
+        validation = continuity_supervisor_agent(scenes, bible)
+        final_scenes = validation.fixed_scenes
+        
+        job_dir = os.path.join(JOBS_DIR, job_id)
+        with open(os.path.join(job_dir, "debug_report.json"), "w") as f:
+            f.write(validation.model_dump_json(indent=2))
+
+        # 6. Post Producer Plan
+        editor_plan = post_producer_agent(final_scenes)
+        
+        # 7. Render Scenes (Parallel)
+        render_tasks = []
+        for scene in final_scenes:
+            render_tasks.append(render_scene_task.s(job_id, scene.model_dump()))
+            
+        update_job_status(job_id, "rendering", 75, "Rendering scenes...")
+        
+        # Execute render, then assembly
+        workflow = chord(render_tasks)(assemble_video.s(job_id))
+    except Exception as e:
+        logger.error(f"Continuity/Render Setup failed for {job_id}: {e}")
+        update_job_status(job_id, "failed", 0, f"Error in production: {str(e)}")
+        raise e
 
 @celery_app.task(name="tasks.render_scene_task")
 def render_scene_task(job_id, scene_dict):
