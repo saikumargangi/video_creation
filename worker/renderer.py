@@ -1,5 +1,6 @@
 import os
 import math
+import traceback
 import logging
 # Monkeypatch PIL.Image.ANTIALIAS for moviepy compatibility
 import PIL.Image
@@ -102,6 +103,7 @@ def render_scene(scene: SceneLayout, output_path: str, character_path: str = Non
         
     except Exception as e:
         logger.error(f"Error rendering scene {scene.scene_id}: {e}")
+        logger.error(traceback.format_exc())
         # Create a red error clip so pipeline doesn't break completely
         error_clip = ColorClip(size=(1280, 720), color=(255, 0, 0), duration=scene.duration)
         error_clip.fps = 24

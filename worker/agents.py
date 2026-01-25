@@ -178,6 +178,21 @@ def generate_character_image(image_prompt: str, output_path: str) -> bool:
         
     except Exception as e:
         logger.error(f"Failed generation: {e}")
+
+    # Fallback to programmatic generation if AI fails (e.g. safety filters)
+    try:
+        logger.warning(f"Generating fallback placeholder character due to API failure/safety.")
+        from PIL import Image, ImageDraw
+        img = Image.new('RGBA', (512, 512), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        # Draw a generic blue humanoid/box
+        draw.rectangle([150, 150, 362, 450], fill='blue', outline='black', width=5) # Body
+        draw.ellipse([180, 50, 332, 200], fill='yellow', outline='black', width=5) # Head
+        img.save(output_path)
+        logger.info(f"Fallback character saved to {output_path}")
+        return True
+    except Exception as fe:
+        logger.error(f"Critical: Failed to generate fallback character: {fe}")
         
     return False
 
